@@ -8,6 +8,7 @@
   },
   "private": true,
   "dependencies": {
+    "@max-xoo/mawaqit": "^1.0.0",
     "fastify": "^5.7.1"
   }
 }

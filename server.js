@@ -1,9 +1,13 @@
 const fastify = require("fastify")({ logger: true });
+
+const mawaqit = require("@max-xoo/mawaqit");
+
 const fs = require("fs");
 const path = require("path");
 
 const surahs = JSON.parse(fs.readFileSync(path.join("data", "surahs.json"), "utf-8"));
 
+// Routes Quran existantes
 fastify.get("/surahs", async () => {
     const surahsList = Object.values(surahs).map(surah => ({
         number: surah.number,
@@ -143,15 +147,98 @@ fastify.get("/surah/:surah/:aya/audio", {
     return reply.send(stream);
 });
 
+// Routes Mawaqit
+fastify.get("/mawaqit/:slug/search", {
+    schema: {
+        params: {
+            type: "object",
+            properties: {
+                slug: { type: "string" }
+            }
+        }
+    }
+}, async (request, reply) => {
+    const { slug } = request.params;
+    
+    try {
+        const encodedSlug = encodeURIComponent(slug);
+        const url = `https://mawaqit.net/api/2.0/mosque/search?word=${encodedSlug}&fields=slug%2Clabel`;
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            reply.code(response.status);
+            return {
+                success: false,
+                error: `Failed to fetch mosque search results`
+            };
+        }
+        
+        const data = await response.json();
+        
+        return {
+            success: true,
+            data: data
+        };
+    } catch (error) {
+        reply.code(500);
+        return {
+            success: false,
+            error: `Error fetching mosque search: ${error.message}`
+        };
+    }
+});
+
+fastify.get("/mawaqit/:slug/prayer-times", {
+    schema: {
+        params: {
+            type: "object",
+            properties: {
+                slug: { type: "string" }
+            }
+        }
+    }
+}, async (request, reply) => {
+    const { slug } = request.params;
+    
+    try {
+        const data = await mawaqit.getPrayerTimesOfTheDay(slug);
+        
+        return {
+            success: true,
+            data: data
+        };
+    } catch (error) {
+        reply.code(500);
+        return {
+            success: false,
+            error: `Error fetching prayer times: ${error.message}`
+        };
+    }
+});
+
+fastify.get("/mawaqit/:slug/announcements", async (request, reply) => {
+    const { slug } = request.params;
+    try {
+        const data = await mawaqit.getAnnouncements(slug);
+        return { success: true, data };
+    } catch (error) {
+        reply.code(500);
+        return { success: false, error: `Error fetching announcements: ${error.message}` };
+    }
+});
+
 const start = async () => {
     try {
-        await fastify.listen({ port: 7777, host: "0.0.0.0" });
-        console.log("\n🚀  Quran API started on http://localhost:7777");
+        await fastify.listen({ port: 4001, host: "0.0.0.0" });
+        console.log("\n🚀  Quran API started on http://localhost:4001");
         console.log("\nAvailable routes:");
         console.log("  GET /surahs");
         console.log("  GET /surah/:surah");
         console.log("  GET /surah/:surah/:aya");
         console.log("  GET /surah/:surah/:aya/audio");
+        console.log("  GET /mawaqit/:slug/search");
+        console.log("  GET /mawaqit/:slug/prayer-times");
         console.log("  ");
     } catch (err) {
         fastify.log.error(err);
